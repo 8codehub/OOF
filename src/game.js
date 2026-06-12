@@ -430,6 +430,57 @@
       ctx.beginPath(); ctx.arc(W-72,108,34,0,Math.PI*2); ctx.fillStyle=C.hair; ctx.fill();
       ctx.beginPath(); ctx.arc(W-60,100,30,0,Math.PI*2); ctx.fillStyle=C.bg; ctx.fill();
       hills(para(0.4), baseY-6, 80, 46, C.hair);
+    } else if(theme==='airbase'){
+      // Night sky — deep old-movie Prussian blue gradient
+      const skyGrad=ctx.createLinearGradient(0,0,0,baseY);
+      skyGrad.addColorStop(0,  '#0b1a35');
+      skyGrad.addColorStop(0.6,'#112244');
+      skyGrad.addColorStop(1,  '#1a2e55');
+      ctx.fillStyle=skyGrad; ctx.fillRect(0,0,W,H);
+
+      // Stars — blue-white
+      ctx.fillStyle='#c8d8f0'; ctx.globalAlpha=0.55;
+      ctx.beginPath();
+      for(let i=0;i<90;i++){
+        const sx=~~(((i*137+para(0.04))%(W+40)+W+40)%W), sy=~~((i*61+7)%(baseY*0.78));
+        ctx.rect(sx, sy, i%4===0?2:1, i%4===0?2:1);
+      }
+      ctx.fill(); ctx.globalAlpha=1;
+
+      // Crescent moon — pale amber-white
+      ctx.fillStyle='#e8dfc0';
+      ctx.beginPath(); ctx.arc(W-84,52,20,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#0e2040';
+      ctx.beginPath(); ctx.arc(W-75,47,17,0,Math.PI*2); ctx.fill();
+
+      // Far hangars — two parallax layers, blue-tinted silhouettes
+      const h1=para(0.18), h2=para(0.34);
+      ctx.fillStyle='#2a4060';
+      ctx.beginPath();
+      for(let i=0;i<8;i++){
+        const hx=~~(((h1+i*160)%W+W)%W)-10;
+        const hw=80+(i*31%40), hh=42+(i*17%22);
+        ctx.rect(hx, ~~(baseY-hh), hw, hh);
+        ctx.moveTo(hx, ~~(baseY-hh)); ctx.lineTo(~~(hx+hw/2), ~~(baseY-hh-14)); ctx.lineTo(hx+hw, ~~(baseY-hh)); ctx.closePath();
+      }
+      ctx.fill();
+      ctx.fillStyle='#1e3050';
+      ctx.beginPath();
+      for(let i=0;i<5;i++){
+        const hx=~~(((h2+i*200+80)%W+W)%W)-10;
+        const hw=110+(i*23%50), hh=60+(i*13%28);
+        ctx.rect(hx, ~~(baseY-hh), hw, hh);
+        ctx.moveTo(hx, ~~(baseY-hh)); ctx.lineTo(~~(hx+hw/2), ~~(baseY-hh-18)); ctx.lineTo(hx+hw, ~~(baseY-hh)); ctx.closePath();
+      }
+      ctx.fill();
+
+      // Control tower
+      const tx=~~(((para(0.22)+300)%W+W)%W);
+      ctx.fillStyle='#2a4060';
+      ctx.fillRect(tx, ~~(baseY-120), 18, 98);
+      ctx.fillRect(tx-10, ~~(baseY-128), 38, 14);
+      ctx.fillRect(tx+6, ~~(baseY-140), 6, 14);
+
     }
   }
   function tile(off,W2){ return ((off% W2)+W2)%W2; }
