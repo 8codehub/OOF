@@ -39,6 +39,22 @@
 
   let world=null, levelIdx=0, raf=0, running=false, lastT=0;
 
+  // ---------- level audio ----------
+  let _bgAudio = null;
+  function startLevelAudio(levelN){
+    stopLevelAudio();
+    if(window.LRSettings && window.LRSettings.music === false) return;
+    const url = window.__resources && window.__resources['level'+levelN+'-music'];
+    if(!url) return;
+    _bgAudio = new Audio(url);
+    _bgAudio.loop = true;
+    _bgAudio.volume = 0.55;
+    _bgAudio.play().catch(()=>{});
+  }
+  function stopLevelAudio(){
+    if(_bgAudio){ _bgAudio.pause(); _bgAudio.currentTime=0; _bgAudio=null; }
+  }
+
   function buildWorld(idx){
     const L = window.LRLevels[idx];
     const baseY = H*0.74;
@@ -225,12 +241,14 @@
   function kill(){
     if(world.fox.dead||world.fox.win) return;
     world.fox.dead=true;
+    stopLevelAudio();
     if(navigator.vibrate && window.LRSettings && window.LRSettings.vibration) navigator.vibrate(40);
     setTimeout(()=>{ stop(); Game.onLose && Game.onLose(stats()); }, 520);
   }
   function doWin(){
     if(world.fox.win||world.fox.dead) return;
     world.fox.win=true;
+    stopLevelAudio();
     setTimeout(()=>{ stop(); Game.onWin && Game.onWin(stats()); }, 420);
   }
   function stats(){
@@ -434,6 +452,7 @@
     levelIdx = idx;
     readColors(); resize();
     buildWorld(idx);
+    startLevelAudio(world.L.n);
     const h=document.getElementById('draw-hint'); if(h){ h.style.opacity=1; }
     running=true; lastT=performance.now();
     cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
@@ -441,7 +460,7 @@
   }
   function pause(){ running=false; cancelAnimationFrame(raf); }
   function resume(){ if(running) return; readColors(); running=true; lastT=performance.now(); raf=requestAnimationFrame(loop); }
-  function stop(){ running=false; cancelAnimationFrame(raf); }
+  function stop(){ running=false; cancelAnimationFrame(raf); stopLevelAudio(); }
   function restart(){ start(levelIdx); }
 
   function stageDemo(){
