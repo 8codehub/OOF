@@ -17,7 +17,8 @@
    ============================================================ */
 (function(){
   const cv = document.getElementById('play');
-  const ctx = cv.getContext('2d');
+  // alpha:false lets the compositor skip the transparency pass — free perf win
+  const ctx = cv.getContext('2d', { alpha: false });
 
   // theme palette pulled from CSS (re-read on tweak)
   let C = {};
@@ -32,12 +33,16 @@
   function resize(){
     const r = cv.getBoundingClientRect();
     W = cv.clientWidth || 390; H = cv.clientHeight || 720;
-    dpr = Math.min(window.devicePixelRatio||1, 2.5);
+    dpr = Math.min(window.devicePixelRatio||1, 2.0);
     cv.width = W*dpr; cv.height = H*dpr;
     ctx.setTransform(dpr,0,0,dpr,0,0);
   }
 
   let world=null, levelIdx=0, raf=0, running=false, lastT=0;
+
+  // Cached HUD element refs + previous values to avoid redundant DOM writes
+  let _hudFill=null, _hudDist=null, _hudCoins=null;
+  let _prevDist=-1, _prevCoins=-1;
 
   // ---------- level audio ----------
   let _bgAudio = null;
@@ -114,7 +119,8 @@
   function surfaceAt(x, minY){
     let best=null;
     for(const s of world.segs){
-      if(x>=s[0] && x<=s[1]){ if(world.baseY>=minY && (best===null||world.baseY<best)) best=world.baseY; }
+      if(s[0] > x) break;           // segs are left→right sorted; no point checking further
+      if(x<=s[1]){ if(world.baseY>=minY && (best===null||world.baseY<best)) best=world.baseY; }
     }
     const strokesToCheck = world.drawing ? [...world.strokes, world.drawing] : world.strokes;
     for(const st of strokesToCheck){
@@ -262,77 +268,98 @@
   // ---------- render ----------
   function render(){
     const w=world, f=w.fox;
-    ctx.clearRect(0,0,W,H);
-    drawBackground(w.L.theme, w.camX);
+    const cx=w.camX, cxR=cx+W;  // viewport left / right in world coords
+
+    // Fill background (alpha:false ctx — no clearRect needed, bg fill covers everything)
+    drawBackground(w.L.theme, cx);
 
     ctx.save();
-    ctx.translate(-w.camX, 0);
+    ctx.translate(-cx, 0);
 
-    // ground silhouette
+    // ---- ground silhouette — one batched path ----
     ctx.fillStyle = C.ink;
+    ctx.beginPath();
     for(const s of w.segs){
-      const x0=s[0], x1=s[1];
-      if(x1 < w.camX-40 || x0 > w.camX+W+40) continue;
-      ctx.fillRect(x0, w.baseY, x1-x0, H);
+      if(s[1] < cx-40) continue;
+      if(s[0] > cxR+40) break;
+      ctx.rect(s[0], w.baseY, s[1]-s[0], H-w.baseY);
     }
-    // ground lip highlight
+    ctx.fill();
+
+    // ---- ground lip highlight — one batched path ----
     ctx.fillStyle = C.accent;
+    ctx.beginPath();
     for(const s of w.segs){
-      if(s[1] < w.camX-40 || s[0] > w.camX+W+40) continue;
-      ctx.fillRect(s[0], w.baseY-3, s[1]-s[0], 3);
+      if(s[1] < cx-40) continue;
+      if(s[0] > cxR+40) break;
+      ctx.rect(s[0], w.baseY-3, s[1]-s[0], 3);
     }
+    ctx.fill();
 
-    // spikes
+    // ---- spikes — one batched path ----
     ctx.fillStyle = C.ink;
+    ctx.beginPath();
     for(const sp of w.spikes){
-      if(sp.x < w.camX-40 || sp.x > w.camX+W+40) continue;
-      const n=Math.max(2,Math.round(sp.w/12));
+      if(sp.x < cx-40 || sp.x > cxR+40) continue;
+      const n=Math.max(2,Math.round(sp.w/12)), tw=sp.w/n;
       for(let i=0;i<n;i++){
-        const bx=sp.x-sp.w/2 + i*(sp.w/n);
-        ctx.beginPath();
-        ctx.moveTo(bx, w.baseY); ctx.lineTo(bx+(sp.w/n)/2, w.baseY-24); ctx.lineTo(bx+sp.w/n, w.baseY); ctx.closePath(); ctx.fill();
+        const bx=sp.x-sp.w/2 + i*tw;
+        ctx.moveTo(bx, w.baseY);
+        ctx.lineTo(bx+tw/2, w.baseY-24);
+        ctx.lineTo(bx+tw, w.baseY);
+        ctx.closePath();
       }
     }
+    ctx.fill();
 
-    // flag at end
-    drawFlag(w.worldEnd, w.baseY);
+    // ---- flag (only when visible) ----
+    if(w.worldEnd > cx-40 && w.worldEnd < cxR+120) drawFlag(w.worldEnd, w.baseY);
 
-    // saws
+    // ---- saws ----
     for(const sw of w.saws){
-      if(sw.x < w.camX-40 || sw.x > w.camX+W+40) continue;
+      if(sw.x < cx-40 || sw.x > cxR+40) continue;
       drawSaw(sw.x, sw.cy||sw.y1, sw.r, w.t);
     }
 
-    // coins
+    // ---- coins — one batched fill + one batched stroke ----
+    const coinDark='color-mix(in oklab,'+C.accent+',#000 25%)';
+    ctx.beginPath();
     for(const c of w.coins){
-      if(c.got || c.x < w.camX-30 || c.x > w.camX+W+30) continue;
-      const bob = Math.sin(w.t*3 + c.x*0.05)*3;
-      ctx.beginPath(); ctx.arc(c.x, c.y+bob, 9, 0, Math.PI*2);
-      ctx.fillStyle=C.accent; ctx.fill();
-      ctx.lineWidth=2; ctx.strokeStyle='color-mix(in oklab,'+C.accent+',#000 25%)';
-      ctx.beginPath(); ctx.arc(c.x, c.y+bob, 9, 0, Math.PI*2); ctx.stroke();
+      if(c.got || c.x < cx-30 || c.x > cxR+30) continue;
+      const bob=Math.sin(w.t*3 + c.x*0.05)*3;
+      ctx.moveTo(c.x+9, c.y+bob);
+      ctx.arc(c.x, c.y+bob, 9, 0, Math.PI*2);
     }
+    ctx.fillStyle=C.accent; ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle=coinDark; ctx.stroke();
 
-    // drawn ink strokes
+    // ---- ink strokes (viewport-culled, no shadowBlur) ----
     for(const st of w.strokes){
-      const a = st.age<=LIFE ? 1 : 1-(st.age-LIFE)/FADE;
-      drawStroke(st.pts, a);
+      const p=st.pts;
+      if(!p.length) continue;
+      // fast cull: check bounding x of stroke against viewport
+      let sL=p[0].x, sR=p[0].x;
+      for(let i=1;i<p.length;i++){ if(p[i].x<sL) sL=p[i].x; else if(p[i].x>sR) sR=p[i].x; }
+      if(sR < cx-80 || sL > cxR+80) continue;
+      const a=st.age<=LIFE ? 1 : 1-(st.age-LIFE)/FADE;
+      drawStroke(p, a);
     }
     if(w.drawing) drawStroke(w.drawing.pts, 1);
 
-    // level custom render hook (custom entities go here, before character)
+    // ---- level custom render hook ----
     if(w.L.onRender) w.L.onRender(ctx, C, w);
 
-    // character — level can override with its own draw function
+    // ---- character ----
     const drawChar = w.L.character || LRFox.drawFoxCanvas;
     drawChar(ctx, f.x, f.y, f.r, f.phase, C.ink, C.accent, f.air);
 
     ctx.restore();
 
-    // HUD
-    const fill=document.getElementById('ink-fill'); if(fill) fill.style.transform='scaleX('+w.ink+')';
-    const hd=document.getElementById('hud-dist'); if(hd) hd.textContent = Math.max(0,Math.round((f.x-w.startX)/24));
-    const hc=document.getElementById('hud-coins'); if(hc) hc.textContent = w.coinsGot;
+    // ---- HUD (lazy DOM updates — only write when value actually changes) ----
+    if(_hudFill) _hudFill.style.transform='scaleX('+w.ink+')';
+    const dist=Math.max(0, (f.x-w.startX)/24|0);
+    if(dist!==_prevDist){ if(_hudDist) _hudDist.textContent=dist; _prevDist=dist; }
+    if(w.coinsGot!==_prevCoins){ if(_hudCoins) _hudCoins.textContent=w.coinsGot; _prevCoins=w.coinsGot; }
   }
 
   function drawStroke(pts, alpha){
@@ -340,10 +367,10 @@
     ctx.save();
     ctx.globalAlpha=alpha;
     ctx.lineCap='round'; ctx.lineJoin='round';
-    ctx.shadowColor=C.accent; ctx.shadowBlur=14;
     ctx.strokeStyle=C.accent; ctx.lineWidth=7;
-    ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
-    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.stroke();
     ctx.restore();
   }
@@ -394,10 +421,12 @@
       ridges(para(0.42), baseY, 0.95, C.hair);
     } else if(theme==='night'){
       ctx.fillStyle=C.bg2;
+      ctx.beginPath();
       for(let i=0;i<60;i++){
         const sx=((i*97 + para(0.1))%(W+40))-20, sy=(i*53)%(baseY-60);
-        ctx.fillRect(((sx%W)+W)%W, sy, 2,2);
+        ctx.rect(((sx%W)+W)%W, ~~sy, 2, 2);
       }
+      ctx.fill();
       ctx.beginPath(); ctx.arc(W-72,108,34,0,Math.PI*2); ctx.fillStyle=C.hair; ctx.fill();
       ctx.beginPath(); ctx.arc(W-60,100,30,0,Math.PI*2); ctx.fillStyle=C.bg; ctx.fill();
       hills(para(0.4), baseY-6, 80, 46, C.hair);
@@ -414,19 +443,22 @@
   function skyline(off, baseY, scale, col){
     ctx.fillStyle=col; const unit=46;
     let x=-tile(-off,unit*2)-unit*2;
+    ctx.beginPath();
     for(let i=0; x<W+unit; x+=unit, i++){
-      const h=(60+ (i*53%120))*scale;
-      ctx.fillRect(x, baseY-h, unit-6, h);
+      const h=(60+(i*53%120))*scale;
+      ctx.rect(~~x, ~~(baseY-h), unit-6, ~~h);
     }
+    ctx.fill();
   }
   function pines(off, baseY, scale, col, h0){
     ctx.fillStyle=col; const unit=70;
     let x=-tile(-off,unit)-unit;
+    ctx.beginPath();
     for(let i=0; x<W+unit; x+=unit, i++){
-      const h=(h0 + (i*37%50))*scale, w=h*0.5;
-      ctx.beginPath();
-      ctx.moveTo(x, baseY); ctx.lineTo(x+w/2, baseY-h); ctx.lineTo(x+w, baseY); ctx.closePath(); ctx.fill();
+      const h=(h0+(i*37%50))*scale, w2=h*0.5;
+      ctx.moveTo(~~x, baseY); ctx.lineTo(~~(x+w2/2), ~~(baseY-h)); ctx.lineTo(~~(x+w2), baseY); ctx.closePath();
     }
+    ctx.fill();
   }
   function ridges(off, baseY, scale, col){
     ctx.fillStyle=col; const unit=130;
@@ -453,6 +485,10 @@
     readColors(); resize();
     buildWorld(idx);
     startLevelAudio(world.L.n);
+    _hudFill=document.getElementById('ink-fill');
+    _hudDist=document.getElementById('hud-dist');
+    _hudCoins=document.getElementById('hud-coins');
+    _prevDist=-1; _prevCoins=-1;
     const h=document.getElementById('draw-hint'); if(h){ h.style.opacity=1; }
     running=true; lastT=performance.now();
     cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);

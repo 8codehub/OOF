@@ -1,17 +1,5 @@
-/* Level 6 — Skyline II (duplicate of level 2 for testing) */
+/* Level 6 — Neon City  (3 min: 192 × 180 = 34 560 px) */
 (window.LRLevels = window.LRLevels || []).push({
-  // Level-select UI
-  n: 6,
-  name: 'Skyline II',
-  sub: 'Back to the city',
-  locked: false,
-  stars: 0,
-
-  // Game engine (same as level 2)
-  theme: 'city',
-  speed: 158,
-  gaps: 6,
-  spikes: 3,
-  saws: 0,
-  len: 2900,
+  n: 6, name: 'Neon City', sub: 'Back to the city', locked: false, stars: 0,
+  theme: 'city', speed: 192, gaps: 56, spikes: 28, saws: 8, len: 34600,
 });
