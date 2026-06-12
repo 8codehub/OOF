@@ -6,6 +6,7 @@ Usage:
   python3 rebuild.py
 
 How it works:
+  - src/template.html replaces the __bundler/template tag
   - src/levels/*.js   are concatenated (sorted by filename) and prepended
                       to src/game.js, then bundled as the game entry
   - src/app.js        replaces the app-shell entry
@@ -66,6 +67,18 @@ def main():
     # Write updated manifest back into demo.html
     new_manifest_json = json.dumps(manifest, separators=(',', ':'))
     new_html = html[:m.start()] + m.group(1) + new_manifest_json + m.group(3) + html[m.end():]
+
+    # Patch the HTML template if src/template.html exists
+    tpl_path = os.path.join(ROOT, 'src', 'template.html')
+    if os.path.exists(tpl_path):
+        tpl_content = open(tpl_path, 'r', encoding='utf-8').read()
+        tpl_json = json.dumps(tpl_content, ensure_ascii=False)
+        # Escape </ so </script> tags inside the template don't break the outer script tag
+        tpl_json = tpl_json.replace('</', '<\\/')
+        tm = re.search(r'(<script type="__bundler/template">)([\s\S]*?)(</script>)', new_html)
+        if tm:
+            new_html = new_html[:tm.start()] + tm.group(1) + tpl_json + tm.group(3) + new_html[tm.end():]
+            print(f'  updated  src/template.html')
 
     with open(html_path, 'w', encoding='utf-8') as f:
         f.write(new_html)

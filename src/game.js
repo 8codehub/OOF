@@ -28,7 +28,7 @@
           bg:g('--bg'), bg2:g('--bg-2'), hair:g('--hair'), surface:g('--surface') };
   }
 
-  let W=390, H=720, dpr=1;
+  let W=844, H=390, dpr=1;
   function resize(){
     const r = cv.getBoundingClientRect();
     W = cv.clientWidth || 390; H = cv.clientHeight || 720;

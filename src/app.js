@@ -8,8 +8,8 @@
    ============================================================ */
 (function(){
 
-  // settings (read by game.js for haptics)
-  window.LRSettings = { sound:true, music:true, vibration:false, lang:0 };
+  // settings (read by game.js for haptics/difficulty)
+  window.LRSettings = { sound:true, music:true, vibration:false, playful:true, diffMult:1, lang:0 };
   const LANGS = ['English','Español','Français','Deutsch','日本語','Português'];
 
   const $ = s => document.querySelector(s);
@@ -172,7 +172,31 @@
   document.addEventListener('click',(e)=>{
     const tg=e.target.closest('.toggle'); if(!tg) return;
     tg.classList.toggle('on');
-    const k=tg.dataset.setting; if(k) window.LRSettings[k]=tg.classList.contains('on');
+    const k=tg.dataset.setting; if(!k) return;
+    window.LRSettings[k]=tg.classList.contains('on');
+    if(k==='playful'){
+      document.getElementById('device')?.classList.toggle('no-motion', !window.LRSettings.playful);
+    }
+  });
+
+  // difficulty segmented control
+  document.addEventListener('click',(e)=>{
+    const btn=e.target.closest('.seg-btn'); if(!btn) return;
+    const ctrl=btn.closest('.seg-ctrl'); if(!ctrl) return;
+    ctrl.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    window.LRSettings.diffMult = parseFloat(btn.dataset.diff) || 1;
+  });
+
+  // color picker (accent swatches in settings)
+  document.addEventListener('pointerdown',(e)=>{
+    const sw=e.target.closest('.cp-sw'); if(!sw) return;
+    const color=sw.dataset.c; if(!color) return;
+    const root=document.documentElement.style;
+    root.setProperty('--accent', color);
+    root.setProperty('--accent-soft', color+'1f');
+    if(window.Game) Game.readColors();
+    document.querySelectorAll('.cp-sw').forEach(s=>s.classList.toggle('active', s.dataset.c===color));
   });
 
   function shake(el){ el.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:260}); }
