@@ -67,7 +67,7 @@
     const worldEnd = startX + L.len;
     // ground intervals with gaps
     const segs=[]; const spikes=[]; const coins=[]; const saws=[];
-    let x = startX-120;
+    let x = startX-300;   // extend left so the intro vehicle has ground under it
     segs.push([x, startX+220]); x = startX+220;
     const gapXs=[];
     for(let i=0;i<L.gaps;i++){
@@ -196,7 +196,7 @@
     // horizontal — constant run (difficulty-scaled)
     f.x += w.L.speed*(window.LRSettings && window.LRSettings.diffMult || 1)*dt;
     f.phase += dt*14;
-    w.camX = f.x - 116;
+    w.camX = f.x - (w.camOffset != null ? w.camOffset : 116);
 
     // vertical / surface follow
     if(f.air){
@@ -410,7 +410,174 @@
     ctx.fillStyle = C.bg; ctx.fillRect(0,0,W,H);
     const baseY=world.baseY;
     const para=(f)=> -(camX*f);
-    if(theme==='meadow'){
+    if(theme==='nyc'){
+      // Golden-hour sky
+      const skyG=ctx.createLinearGradient(0,0,0,baseY);
+      skyG.addColorStop(0,'#5a9fd4'); skyG.addColorStop(0.65,'#f5c07a'); skyG.addColorStop(1,'#e8896a');
+      ctx.fillStyle=skyG; ctx.fillRect(0,0,W,H);
+      // Far buildings
+      skyline(para(0.16), baseY, 0.44, '#c9c4b8');
+      // Near buildings with a spike (Empire State silhouette inserted)
+      const p2=para(0.34);
+      skyline(p2, baseY, 0.76, '#a09890');
+      // Empire State spike (index position: roughly centre of near layer)
+      { const ex=~~(((p2+300)%(W+120)+W+120)%W)-10;
+        for(const dx of [0,-W,W]){
+          const bx=~~(ex+dx); if(bx+28<0||bx-28>W) continue;
+          ctx.fillStyle='#a09890';
+          ctx.fillRect(bx,~~(baseY-144),28,90);         // body
+          ctx.beginPath(); ctx.moveTo(bx-2,~~(baseY-144));
+          ctx.lineTo(bx+14,~~(baseY-186)); ctx.lineTo(bx+30,~~(baseY-144)); ctx.closePath(); ctx.fill(); // spire
+        }
+      }
+      // Statue of Liberty — detailed verdigris figure, very slow parallax.
+      const lt=world ? world.t : 0;
+      const lx=~~(((para(0.055)+90)%(W+220)+W+220)%W)-60;
+      // Friendly greeting wave: the raised torch arm sways gently.
+      const wave = Math.sin(lt*2.2);
+      // Export the nearest-to-centre statue's mouth (screen coords) so the
+      // level can anchor a speech bubble there.
+      world.statueMouthX = null; world.statueMouthY = null;
+      let _stBest = 1e9;
+      for(const dx of [0,-W,W]){
+        const sx=~~(lx+dx); if(sx+80<0||sx-80>W) continue;
+        const by=baseY;
+        { const d=Math.abs(sx+1-W/2); if(d<_stBest){ _stBest=d; world.statueMouthX=sx+4; world.statueMouthY=by-167; } }
+        // Verdigris palette with a consistent light-from-left scheme
+        const green='#7DB6A0', greenDk='#5A917C', greenLt='#9BCBB4', greenSh='#4C7E6A',
+              stone='#cfc9bb', stoneDk='#aea796';
+
+        // ============ PEDESTAL (granite star-fort base) ============
+        ctx.fillStyle=stoneDk;
+        ctx.fillRect(sx-34,~~(by-30),68,30);          // wide foundation
+        ctx.fillStyle=stone;
+        ctx.fillRect(sx-31,~~(by-30),62,4);           // foundation cap
+        ctx.fillStyle=stoneDk;
+        ctx.fillRect(sx-25,~~(by-56),50,26);          // mid pedestal
+        // Pedestal columns (vertical relief)
+        ctx.strokeStyle=stone; ctx.lineWidth=1.2;
+        for(let k=-2;k<=2;k++){ ctx.beginPath(); ctx.moveTo(sx+k*9,~~(by-54)); ctx.lineTo(sx+k*9,~~(by-32)); ctx.stroke(); }
+        ctx.fillStyle=stone;
+        ctx.fillRect(sx-19,~~(by-68),38,12);          // plinth the statue stands on
+        ctx.fillStyle=stoneDk;
+        ctx.fillRect(sx-19,~~(by-58),38,2);
+
+        // ============ ROBE / GOWN (flowing draped toga) ============
+        ctx.fillStyle=green;
+        ctx.beginPath();
+        ctx.moveTo(sx-19,~~(by-68));                          // left hem
+        ctx.quadraticCurveTo(sx-20,~~(by-110), sx-13,~~(by-138)); // left side, waist pinch
+        ctx.quadraticCurveTo(sx-12,~~(by-150), sx-9,~~(by-156)); // up to left shoulder
+        ctx.lineTo(sx+9,~~(by-156));                          // shoulder line
+        ctx.quadraticCurveTo(sx+13,~~(by-150), sx+14,~~(by-138)); // right shoulder down
+        ctx.quadraticCurveTo(sx+21,~~(by-108), sx+19,~~(by-68));  // right side to hem
+        ctx.quadraticCurveTo(sx,~~(by-62), sx-19,~~(by-68));      // curved hem
+        ctx.closePath(); ctx.fill();
+        // Shaded (right/dark) half of gown for volume
+        ctx.fillStyle=greenDk;
+        ctx.beginPath();
+        ctx.moveTo(sx+2,~~(by-156));
+        ctx.quadraticCurveTo(sx+13,~~(by-150), sx+14,~~(by-138));
+        ctx.quadraticCurveTo(sx+21,~~(by-108), sx+19,~~(by-68));
+        ctx.quadraticCurveTo(sx+9,~~(by-64), sx+3,~~(by-66));
+        ctx.closePath(); ctx.fill();
+        // Drapery fold lines
+        ctx.strokeStyle=greenSh; ctx.lineWidth=1.3; ctx.lineCap='round';
+        ctx.beginPath();
+        ctx.moveTo(sx-9,~~(by-150)); ctx.quadraticCurveTo(sx-12,~~(by-110), sx-10,~~(by-70));
+        ctx.moveTo(sx-1,~~(by-148)); ctx.quadraticCurveTo(sx-2,~~(by-108), sx-1,~~(by-68));
+        ctx.moveTo(sx+7,~~(by-148)); ctx.quadraticCurveTo(sx+9,~~(by-106), sx+8,~~(by-70));
+        ctx.stroke();
+        // Gathered sash across waist
+        ctx.strokeStyle=greenLt; ctx.lineWidth=2;
+        ctx.beginPath(); ctx.moveTo(sx-13,~~(by-128)); ctx.quadraticCurveTo(sx,~~(by-122), sx+14,~~(by-130)); ctx.stroke();
+        // Foot/sandal peeking from hem
+        ctx.fillStyle=greenDk;
+        ctx.fillRect(sx-15,~~(by-66),10,5);
+
+        // ============ TABLET (held in left arm) ============
+        ctx.save();
+        ctx.translate(sx-15,~~(by-98)); ctx.rotate(0.42);
+        ctx.fillStyle=greenSh;                               // tablet edge (shadow)
+        ctx.fillRect(-8,-3,17,24);
+        ctx.fillStyle=greenLt;                               // tablet face
+        ctx.fillRect(-7,-2,15,22);
+        ctx.strokeStyle=greenDk; ctx.lineWidth=0.9;          // engraved inscription lines
+        for(let r=0;r<4;r++){ ctx.beginPath(); ctx.moveTo(-4,2+r*5); ctx.lineTo(5,2+r*5); ctx.stroke(); }
+        ctx.restore();
+        // Left forearm crossing over the tablet
+        ctx.fillStyle=green;
+        ctx.beginPath();
+        ctx.moveTo(sx-9,~~(by-128)); ctx.lineTo(sx-15,~~(by-90));
+        ctx.lineTo(sx-8,~~(by-88)); ctx.lineTo(sx-2,~~(by-126)); ctx.closePath(); ctx.fill();
+        ctx.fillStyle=greenDk;
+        ctx.fillRect(sx-15,~~(by-92),5,4);                   // hand on tablet
+
+        // ============ HEAD + NECK (three-quarter, facing the fox/right) ============
+        ctx.fillStyle=greenDk;
+        ctx.fillRect(sx-3,~~(by-162),6,8);                   // neck
+        ctx.fillStyle=green;                                 // head (oval)
+        ctx.beginPath(); ctx.ellipse(sx+1,~~(by-169),7.5,9,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle=greenLt;                               // lit left cheek
+        ctx.beginPath(); ctx.ellipse(sx-1,~~(by-170),4.5,6,0,0,Math.PI*2); ctx.fill();
+        // Nose/brow profile bump (faces right)
+        ctx.fillStyle=green;
+        ctx.beginPath();
+        ctx.moveTo(sx+7,~~(by-172)); ctx.quadraticCurveTo(sx+11,~~(by-169), sx+7,~~(by-166));
+        ctx.closePath(); ctx.fill();
+
+        // ============ SEVEN-SPIKE RADIANT CROWN ============
+        ctx.fillStyle=greenDk;
+        ctx.beginPath(); ctx.ellipse(sx+1,~~(by-177),9,4,0,Math.PI,0); ctx.fill(); // crown band
+        ctx.fillStyle=greenLt;
+        for(let k=0;k<7;k++){
+          const a=-Math.PI*0.94 + (k/6)*Math.PI*0.88;        // radiate across the top
+          const cxk=sx+1+Math.cos(a)*9, cyk=(by-177)+Math.sin(a)*7;
+          ctx.save(); ctx.translate(cxk,~~cyk); ctx.rotate(a+Math.PI/2);
+          ctx.beginPath(); ctx.moveTo(-2,0); ctx.lineTo(0,-13); ctx.lineTo(2,0); ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // ============ RAISED RIGHT ARM + TORCH (the wave) ============
+        ctx.save();
+        ctx.translate(sx+9,~~(by-150));
+        ctx.rotate(-0.16 + wave*0.15);                       // gentle greeting sway
+        // Upper arm (with draped sleeve flaring at shoulder)
+        ctx.fillStyle=green;
+        ctx.beginPath();
+        ctx.moveTo(-5,2); ctx.lineTo(-4,-56); ctx.lineTo(4,-56); ctx.lineTo(5,2);
+        ctx.quadraticCurveTo(0,6,-5,2); ctx.closePath(); ctx.fill();
+        ctx.fillStyle=greenDk;
+        ctx.fillRect(1,-56,4,58);                            // arm shadow side
+        // Sleeve drape near shoulder
+        ctx.fillStyle=greenLt;
+        ctx.beginPath(); ctx.moveTo(-5,0); ctx.lineTo(-8,8); ctx.lineTo(-2,6); ctx.closePath(); ctx.fill();
+        // Torch handle + cup
+        ctx.fillStyle='#8f7f4f';
+        ctx.fillRect(-3,-66,6,12);                           // handle
+        ctx.fillStyle='#c9b87a';
+        ctx.beginPath();                                     // golden cup
+        ctx.moveTo(-7,-66); ctx.lineTo(7,-66); ctx.lineTo(4,-74); ctx.lineTo(-4,-74); ctx.closePath(); ctx.fill();
+        // Flame (flicker + glow)
+        const fl=3+Math.sin(lt*9)*0.9;
+        const fg=ctx.createRadialGradient(0,-80,1,0,-80,14+fl);
+        fg.addColorStop(0,'rgba(255,247,205,0.97)');
+        fg.addColorStop(0.45,'rgba(255,200,70,0.8)');
+        fg.addColorStop(1,'rgba(255,150,30,0)');
+        ctx.fillStyle=fg;
+        ctx.beginPath(); ctx.arc(0,-80,14+fl,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#FFE08A';
+        ctx.beginPath();
+        ctx.moveTo(-4,-74); ctx.quadraticCurveTo(-3,-90-fl,0,-94-fl);
+        ctx.quadraticCurveTo(3,-90-fl,4,-74);
+        ctx.quadraticCurveTo(2,-70,0,-72); ctx.quadraticCurveTo(-2,-70,-4,-74);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle='#FFF6D0';                             // hot core
+        ctx.beginPath(); ctx.ellipse(0,-80,1.8,5,0,0,Math.PI*2); ctx.fill();
+        ctx.restore();
+      }
+    } else if(theme==='meadow'){
       ctx.fillStyle=C.bg2;
       ctx.beginPath(); ctx.arc(W-70, 120, 38, 0, Math.PI*2); ctx.fill();
       hills(para(0.25), baseY-30, 120, 70, C.bg2);
