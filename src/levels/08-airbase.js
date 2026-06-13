@@ -2,6 +2,25 @@
 (function () {
 
   /* ---- private helpers ---- */
+
+  function playWinJingle() {
+    try {
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      // Airy ascending arpeggio — C D E G B C
+      [523, 587, 659, 784, 988, 1047].forEach((hz, i) => {
+        const osc = ac.createOscillator();
+        const g   = ac.createGain();
+        osc.connect(g); g.connect(ac.destination);
+        osc.type = 'sine'; osc.frequency.value = hz;
+        const t0 = ac.currentTime + i * 0.10;
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(0.22, t0 + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.55);
+        osc.start(t0); osc.stop(t0 + 0.6);
+      });
+    } catch(e) {}
+  }
+
   function hex2rgb(h) {
     h = (h || '#000').trim();
     if (h[0] === '#') h = h.slice(1);
@@ -79,6 +98,35 @@
     ctx.restore();
   }
 
+  function drawUFO(ctx, x, y, t, sil) {
+    ctx.save();
+    ctx.translate(x, y);
+    // Tinted dome (larger)
+    ctx.fillStyle = 'rgba(140,220,255,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(0, -11, 27, 21, 0, Math.PI, 0);
+    ctx.fill();
+    // Main disc (larger)
+    ctx.fillStyle = sil(0.9);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 54, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Underside shading (larger)
+    ctx.fillStyle = sil(0.45);
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 45, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Spinning rim lights (more, larger)
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + t * 1.8;
+      const lx = Math.cos(a) * 38, ly = Math.sin(a) * 8.8;
+      const pulse = 0.45 + 0.55 * Math.abs(Math.sin(t * 5 + i * 0.9));
+      ctx.fillStyle = `rgba(80,230,160,${(pulse * 0.95).toFixed(2)})`;
+      ctx.beginPath(); ctx.arc(lx, ly, 4.5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   /* Two specific background hangars used as helipad targets.
      Formulas match drawBackground exactly: para(f) = -(camX * f)
      Layer h1 (para 0.18):  hx = ((h1 + i*160) % W + W) % W - 10
@@ -93,25 +141,23 @@
     const base = -(camX * def.f);
     const hx0  = ~~(((base + def.i * def.iStep + def.iOff) % W + W) % W) - 10;
     // hx0 is always in [-10, W-11] — the modulo already gives the right copy.
-    // No wrap-copy detection needed; it caused the wrong copy to be picked when
-    // the building was entering from the right (hx0 near W).
     return { x: hx0 + def.hw / 2, topY: baseY - def.hh };
   }
 
   /* ---- level ---- */
   (window.LRLevels = window.LRLevels || []).push({
     n: 7, name: 'Air Base', sub: 'Eyes on the sky', locked: false, stars: 0,
-    theme: 'airbase', speed: 200, gaps: 60, spikes: 32, saws: 9, len: 36000,
+    theme: 'airbase', speed: 200, gaps: 13, spikes: 7, saws: 2, len: 7560,
 
     onBuild(w) {
       const rnd = (a, b) => a + Math.random() * (b - a);
 
       w.airbase = {
         t: 0, cssW: 844, cssH: 390,
-        // padScreens computed each frame in onUpdate
         padScreens: PAD_DEFS.map(() => ({ x: 0, topY: 0 })),
-        lastTakeoffTime: -30,  // allow landing on first approach
+        lastTakeoffTime: 0,
         landingTriggered: false,
+        ufoScene: null,
         planes: Array.from({ length: 2 }, () => ({
           x: rnd(40, 800), y: rnd(34, 78),
           v: rnd(26, 40) * (Math.random() < .5 ? 1 : -1), s: rnd(17, 23),
@@ -120,28 +166,45 @@
           x: rnd(40, 800), y: rnd(60, 104),
           v: rnd(13, 22) * (Math.random() < .5 ? 1 : -1), s: rnd(15, 19),
           bob: Math.random() * 6.28,
-          state: 'fly',   // fly | land | sit | rise
+          state: 'fly',
           padIdx: 0, riseY: 0, sitStartT: 0,
         })),
       };
+    },
+
+    // Called by game.js doWin — return true to take over the win sequence.
+    onWin(w, proceed) {
+      const A = w.airbase; if (!A) return false;
+      const cssW = A.cssW || 844;
+      playWinJingle();
+      // UFO starts off the top-left corner and flies diagonally to hover above the fox.
+      A.ufoScene = {
+        phase: 'walk',
+        phaseStartT: w.t,
+        proceed,
+        targetScreenX: cssW * 0.5,
+        foxWorldX: w.fox.x,
+        foxGroundY: w.baseY - w.fox.r,
+        ufoScreenX: -70,   // off top-left
+        ufoScreenY: -70,
+        ufoDescentStartX: -70,
+        ufoDescentStartY: -70,
+        flyStartX: 0,
+        flyStartY: 0,
+        foxAbductStartY: 0,
+      };
+      return true;
     },
 
     onUpdate(w, dt) {
       const A = w.airbase; if (!A) return;
       A.t += dt;
 
-      // Refresh live screen positions of the background landing pads
       const W = A.cssW, baseY = w.baseY;
       for (let k = 0; k < PAD_DEFS.length; k++)
         A.padScreens[k] = calcPad(PAD_DEFS[k], w.camX, W, baseY);
 
-      // hScreenX: screen-space X of the H building center
-      const hScreenX = A.padScreens[0].x;
-
-      // Trigger landing when H is at 80–90% of screen and 30s since last takeoff
-      if (!A.landingTriggered &&
-          hScreenX >= W * 0.8 && hScreenX <= W * 0.9 &&
-          A.t - A.lastTakeoffTime >= 30) {
+      if (!A.landingTriggered && A.t - A.lastTakeoffTime >= 30) {
         const flying = A.helis.filter(h => h.state === 'fly');
         if (flying.length) {
           const h  = flying[~~(Math.random() * flying.length)];
@@ -152,8 +215,6 @@
           A.landingTriggered = true;
         }
       }
-      // Reset landing gate once H has fully scrolled off-screen to the left
-      if (hScreenX < -70) A.landingTriggered = false;
 
       const margin = 90;
       for (const p of A.planes) {
@@ -176,10 +237,10 @@
             const tx = ps.x, ty = ps.topY - h.s * 0.35;
             const dx = tx - h.x, dy = ty - h.y;
             h.v = Math.abs(h.v) * (dx >= 0 ? 1 : -1);
-            h.x += dx * Math.min(1, dt * 1.8);
+            h.x += dx * Math.min(1, dt * 5.0);
             h.y += dy * Math.min(1, dt * 1.2);
             h.bob *= (1 - dt * 5);
-            if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
+            if (Math.abs(dx) < 5 && Math.abs(dy) < 3) {
               h.x = tx; h.y = ty; h.bob = 0;
               h.state = 'sit'; h.sitStartT = A.t;
             }
@@ -187,7 +248,7 @@
           }
 
           case 'sit':
-            h.x = ps.x;  // track building as parallax shifts
+            h.x = ps.x;
             if (A.t - h.sitStartT >= 3) {
               h.riseY = 55 + Math.random() * 40;
               h.state = 'rise';
@@ -195,15 +256,124 @@
             break;
 
           case 'rise':
-            h.x  = ps.x;  // stay above building horizontally while climbing
+            h.x  = ps.x;
             h.y -= 95 * dt;
             h.bob += dt * 2.0;
             if (h.y <= h.riseY) {
               h.y = h.riseY;
               h.state = 'fly';
               A.lastTakeoffTime = A.t;
+              A.landingTriggered = false;
             }
             break;
+        }
+      }
+
+      // ---- UFO win sequence (phase-driven) ----
+      if (A.ufoScene) {
+        const sc = A.ufoScene;
+        const elapsed = w.t - sc.phaseStartT;
+
+        switch (sc.phase) {
+
+          case 'walk': {
+            // Camera is frozen (fox.win=true). Move fox.x so it walks right on screen.
+            w.fox.x += 110 * dt;
+            w.fox.y  = sc.foxGroundY;
+            w.fox.phase += dt * 10;
+            const fsx = w.fox.x - w.camX;
+            if (fsx >= sc.targetScreenX) {
+              w.fox.x = w.camX + sc.targetScreenX;
+              w.fox.y = sc.foxGroundY;
+              sc.foxWorldX = w.fox.x;
+              sc.phase = 'pause';
+              sc.phaseStartT = w.t;
+            }
+            break;
+          }
+
+          case 'pause': {
+            w.fox.x = sc.foxWorldX;
+            w.fox.y = sc.foxGroundY;
+            if (elapsed >= 0.5) {
+              // Snap start coords for diagonal descent from top-left
+              sc.ufoDescentStartX = sc.ufoScreenX;
+              sc.ufoDescentStartY = sc.ufoScreenY;
+              sc.phase = 'ufoDescend';
+              sc.phaseStartT = w.t;
+            }
+            break;
+          }
+
+          case 'ufoDescend': {
+            w.fox.x = sc.foxWorldX;
+            w.fox.y = sc.foxGroundY;
+            // Fly diagonally from top-left to hover point above the fox,
+            // staying below the HUD (TARGET_Y ≥ ~100).
+            const TARGET_X = sc.targetScreenX;
+            const TARGET_Y = 140;
+            const p = Math.min(1, elapsed / 2.0);
+            const e = 1 - Math.pow(1 - p, 3); // cubic ease-out
+            sc.ufoScreenX = sc.ufoDescentStartX + (TARGET_X - sc.ufoDescentStartX) * e;
+            sc.ufoScreenY = sc.ufoDescentStartY + (TARGET_Y - sc.ufoDescentStartY) * e;
+            if (p >= 1) {
+              sc.ufoScreenX = TARGET_X;
+              sc.ufoScreenY = TARGET_Y;
+              sc.phase = 'hover';
+              sc.phaseStartT = w.t;
+            }
+            break;
+          }
+
+          case 'hover': {
+            w.fox.x = sc.foxWorldX;
+            w.fox.y = sc.foxGroundY;
+            sc.ufoScreenY = 140 + Math.sin(elapsed * 4.5) * 3;
+            if (elapsed >= 1.2) {
+              sc.foxAbductStartY = w.fox.y;
+              sc.phase = 'abduct';
+              sc.phaseStartT = w.t;
+            }
+            break;
+          }
+
+          case 'abduct': {
+            const DUR = 1.8;
+            const p = Math.min(1, elapsed / DUR);
+            w.fox.x = sc.foxWorldX;
+            w.fox.y = sc.foxAbductStartY + (sc.ufoScreenY + 30 - sc.foxAbductStartY) * p;
+            w.fox.phase += dt * 12;
+            if (p >= 0.72) w.fox.hidden = true;
+            if (p >= 1) {
+              sc.flyStartX = sc.ufoScreenX;
+              sc.flyStartY = sc.ufoScreenY;
+              sc.phase = 'flyaway';
+              sc.phaseStartT = w.t;
+            }
+            break;
+          }
+
+          case 'flyaway': {
+            const DUR = 2.0;
+            const p  = Math.min(1, elapsed / DUR);
+            const pp = p * p * p; // cubic ease-in — slow start then rockets away
+            const cssW2 = A.cssW || 844;
+            sc.ufoScreenX = sc.flyStartX + (cssW2 + 600 - sc.flyStartX) * pp;
+            sc.ufoScreenY = sc.flyStartY - 550 * p * p;
+            if (p >= 1) {
+              sc.phase = 'done';
+              sc.phaseStartT = w.t;
+            }
+            break;
+          }
+
+          case 'done': {
+            if (elapsed >= 0.2) {
+              sc.proceed();
+              A.ufoScene = null;
+            }
+            break;
+          }
         }
       }
     },
@@ -220,21 +390,19 @@
       const sil = a => `rgba(180,190,200,${a})`;
       const acc = a => `rgba(${ac[0]},${ac[1]},${ac[2]},${a})`;
 
-      // ---- Screen-space: roof searchlights + helis + planes ----
+      // ---- Screen-space: searchlights on H roof + helis + planes + UFO scene ----
       ctx.save();
       ctx.translate(w.camX, 0);
 
-      // Three small searchlights on the H building roof guiding the helicopter:
-      // two on the left side, one on the right side.
+      // Roof searchlights on H building (two: left edge and right edge)
       const ps0 = A.padScreens[0];
       if (ps0.x > -100 && ps0.x < A.cssW + 100) {
         const rx = ps0.x, ry = ps0.topY;
-        const beamL = ry * 0.92;   // almost reaches top of sky
-        const sc    = 0.52;        // smaller than ground lamps
-
+        const beamL = ry * 0.92;
+        const sc    = 0.52;
         const roofLights = [
-          { ox: -55, phase: 0.0 },  // top-left edge
-          { ox:  55, phase: 1.8 },  // top-right edge
+          { ox: -55, phase: 0.0 },
+          { ox:  55, phase: 1.8 },
         ];
         for (const rl of roofLights) {
           const ang = Math.sin(A.t * 0.65 + rl.phase) * 0.7;
@@ -245,6 +413,47 @@
 
       for (const h of A.helis)  drawHeli(ctx, h, sil, A.t);
       for (const p of A.planes) drawPlane(ctx, p, sil);
+
+      // ---- UFO abduction scene (state driven by onUpdate) ----
+      if (A.ufoScene) {
+        const sc = A.ufoScene;
+        const elapsed = w.t - sc.phaseStartT;
+
+        // Tractor beam — shown during hover, abduct, and briefly in flyaway
+        if (sc.phase === 'hover' || sc.phase === 'abduct' || sc.phase === 'flyaway') {
+          let beamAlpha;
+          if (sc.phase === 'hover') {
+            beamAlpha = Math.min(0.38, elapsed / 1.2 * 0.38);
+          } else if (sc.phase === 'abduct') {
+            beamAlpha = 0.38 + Math.min(0.24, elapsed / 1.8 * 0.24);
+          } else {
+            beamAlpha = Math.max(0, 0.62 - elapsed / 0.4 * 0.62);
+          }
+
+          if (beamAlpha > 0.01) {
+            const bx = sc.ufoScreenX;
+            const by = sc.ufoScreenY + 12;
+            // beam bottom tracks fox until it vanishes, then collapses under UFO
+            const bBottom = w.fox.hidden ? sc.ufoScreenY + 44 : w.fox.y;
+            const wProg   = sc.phase === 'hover' ? Math.min(1, elapsed / 0.6) : 1;
+            const bHalfW  = wProg * 32;
+            const bGrad   = ctx.createLinearGradient(0, by, 0, bBottom);
+            bGrad.addColorStop(0, `rgba(80,255,160,${beamAlpha.toFixed(2)})`);
+            bGrad.addColorStop(1, `rgba(80,255,160,0)`);
+            ctx.fillStyle = bGrad;
+            ctx.beginPath();
+            ctx.moveTo(bx - bHalfW * 0.5, by);
+            ctx.lineTo(bx + bHalfW * 0.5, by);
+            ctx.lineTo(bx + bHalfW, bBottom);
+            ctx.lineTo(bx - bHalfW, bBottom);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+
+        // UFO is off-screen (y=-130) during walk/pause — draw it anyway, canvas clips it
+        drawUFO(ctx, sc.ufoScreenX, sc.ufoScreenY, w.t, sil);
+      }
 
       ctx.restore();
     },

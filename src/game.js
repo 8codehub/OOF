@@ -79,7 +79,7 @@
       gapXs.push([x, x+gap]);
       x += gap;
     }
-    segs.push([x, worldEnd+260]);
+    segs.push([x, worldEnd+900]);
     // spikes on solid ground
     for(let i=0;i<L.spikes;i++){
       const seg = segs[2+Math.floor(Math.random()*(segs.length-3))];
@@ -188,6 +188,9 @@
     for(const st of w.strokes){ st.age = w.t - st.born; }
     w.strokes = w.strokes.filter(st=> st.age < LIFE+FADE);
 
+    // level hook runs even during win so the level can animate the fox
+    if(w.L.onUpdate) w.L.onUpdate(w, dt);
+
     if(f.dead || f.win) return;
 
     // horizontal — constant run (difficulty-scaled)
@@ -233,8 +236,6 @@
     // win
     if(f.x >= w.worldEnd){ doWin(); }
 
-    // level custom update hook
-    if(w.L.onUpdate) w.L.onUpdate(w, dt);
   }
 
   let lastHaptic=0;
@@ -255,7 +256,9 @@
     if(world.fox.win||world.fox.dead) return;
     world.fox.win=true;
     stopLevelAudio();
-    setTimeout(()=>{ stop(); Game.onWin && Game.onWin(stats()); }, 420);
+    const proceed = ()=>{ stop(); Game.onWin && Game.onWin(stats()); };
+    if(world.L.onWin && world.L.onWin(world, proceed)) return;
+    setTimeout(proceed, 420);
   }
   function stats(){
     const dist = Math.max(0, Math.round((world.fox.x - world.startX)/24));
@@ -350,8 +353,10 @@
     if(w.L.onRender) w.L.onRender(ctx, C, w);
 
     // ---- character ----
-    const drawChar = w.L.character || LRFox.drawFoxCanvas;
-    drawChar(ctx, f.x, f.y, f.r, f.phase, C.ink, C.accent, f.air);
+    if(!f.hidden){
+      const drawChar = w.L.character || LRFox.drawFoxCanvas;
+      drawChar(ctx, f.x, f.y, f.r, f.phase, C.ink, C.accent, f.air);
+    }
 
     ctx.restore();
 
