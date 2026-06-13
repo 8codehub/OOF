@@ -542,6 +542,94 @@
         }
       }
 
+    } else if(theme==='moon'){
+      // Deep space gradient
+      const skyG=ctx.createLinearGradient(0,0,0,H);
+      skyG.addColorStop(0,'#000008');
+      skyG.addColorStop(0.5,'#04041c');
+      skyG.addColorStop(1,'#0a0825');
+      ctx.fillStyle=skyG; ctx.fillRect(0,0,W,H);
+
+      // Dense starfield — two layers, different densities/colours
+      ctx.beginPath();
+      for(let i=0;i<200;i++){
+        const sx=~~(((i*137+para(0.02))%(W+40)+W+40)%W);
+        const sy=~~((i*73+11)%(baseY*0.93));
+        ctx.rect(sx,sy,i%5===0?2:1,i%5===0?2:1);
+      }
+      ctx.fillStyle='#ffffff'; ctx.globalAlpha=0.52; ctx.fill(); ctx.globalAlpha=1;
+      ctx.beginPath();
+      for(let i=0;i<70;i++){
+        const sx=~~(((i*211+para(0.01))%(W+40)+W+40)%W);
+        const sy=~~((i*97+43)%(baseY*0.88));
+        ctx.rect(sx,sy,1,1);
+      }
+      ctx.fillStyle='#a0c0ff'; ctx.globalAlpha=0.38; ctx.fill(); ctx.globalAlpha=1;
+
+      // Earth — large blue globe in upper-right, very slow parallax
+      const ex=~~(W*0.76+para(0.015)), ey=78, er=58;
+      // Atmospheric halo
+      const ag=ctx.createRadialGradient(ex,ey,er*0.88,ex,ey,er*1.5);
+      ag.addColorStop(0,'rgba(60,130,220,0.18)'); ag.addColorStop(1,'rgba(60,130,220,0)');
+      ctx.fillStyle=ag; ctx.beginPath(); ctx.arc(ex,ey,er*1.5,0,Math.PI*2); ctx.fill();
+      // Ocean
+      ctx.fillStyle='#1a6aab';
+      ctx.beginPath(); ctx.arc(ex,ey,er,0,Math.PI*2); ctx.fill();
+      // Continents (clipped to globe)
+      ctx.save();
+      ctx.beginPath(); ctx.arc(ex,ey,er,0,Math.PI*2); ctx.clip();
+      ctx.fillStyle='#2d8a4e';
+      ctx.beginPath(); ctx.ellipse(ex-er*0.10,ey+er*0.06,er*0.18,er*0.28,0.3,0,Math.PI*2); ctx.fill(); // Africa
+      ctx.beginPath(); ctx.ellipse(ex-er*0.04,ey-er*0.22,er*0.30,er*0.15,-0.2,0,Math.PI*2); ctx.fill(); // Eurasia
+      ctx.beginPath(); ctx.ellipse(ex-er*0.38,ey-er*0.06,er*0.12,er*0.22,0.1,0,Math.PI*2); ctx.fill(); // Americas
+      ctx.beginPath(); ctx.ellipse(ex+er*0.28,ey+er*0.24,er*0.10,er*0.08,0.5,0,Math.PI*2); ctx.fill(); // Australia
+      // Cloud wisps
+      ctx.fillStyle='rgba(255,255,255,0.30)';
+      ctx.beginPath(); ctx.ellipse(ex+er*0.08,ey-er*0.38,er*0.24,er*0.07,0.8,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(ex-er*0.22,ey+er*0.28,er*0.18,er*0.06,-0.4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(ex+er*0.14,ey+er*0.08,er*0.11,er*0.04,0.6,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+      // Atmosphere limb glow
+      const rim=ctx.createRadialGradient(ex,ey,er*0.74,ex,ey,er);
+      rim.addColorStop(0,'rgba(80,170,255,0)'); rim.addColorStop(1,'rgba(80,170,255,0.40)');
+      ctx.fillStyle=rim; ctx.beginPath(); ctx.arc(ex,ey,er,0,Math.PI*2); ctx.fill();
+      // Specular highlight
+      const hi=ctx.createRadialGradient(ex-er*0.30,ey-er*0.35,0,ex,ey,er);
+      hi.addColorStop(0,'rgba(255,255,255,0.20)');
+      hi.addColorStop(0.38,'rgba(255,255,255,0.04)');
+      hi.addColorStop(1,'rgba(255,255,255,0)');
+      ctx.fillStyle=hi; ctx.beginPath(); ctx.arc(ex,ey,er,0,Math.PI*2); ctx.fill();
+
+      // Background lunar mountains — far layer
+      ctx.fillStyle='#141420';
+      ctx.beginPath();
+      for(let i=0;i<11;i++){
+        const mx=((para(0.14)+i*118)%(W+130)+W+130)%W-20;
+        const mh=36+(i*37%28), mw=88+(i*23%40);
+        ctx.moveTo(~~mx,baseY-1);
+        ctx.quadraticCurveTo(~~(mx+mw/2),~~(baseY-mh),~~(mx+mw),baseY-1);
+      }
+      ctx.fill();
+      // Near terrain layer
+      ctx.fillStyle='#0e0e1a';
+      ctx.beginPath();
+      for(let i=0;i<8;i++){
+        const mx=((para(0.28)+i*155)%(W+165)+W+165)%W-20;
+        const mh=20+(i*29%18), mw=125+(i*31%50);
+        ctx.moveTo(~~mx,baseY-1);
+        ctx.quadraticCurveTo(~~(mx+mw/2),~~(baseY-mh),~~(mx+mw),baseY-1);
+      }
+      ctx.fill();
+
+      // Surface craters (shallow ellipses on horizon)
+      ctx.strokeStyle='rgba(80,80,130,0.35)'; ctx.lineWidth=1.5;
+      for(let i=0;i<6;i++){
+        const cx2=~~(((para(0.10)+i*190+55)%(W+40)+W+40)%W);
+        const cy2=~~(baseY-12-(i*23%16)), cr=9+(i*11%9);
+        ctx.beginPath();
+        ctx.ellipse(cx2,cy2,cr,cr*0.34,0,0,Math.PI*2);
+        ctx.stroke();
+      }
     }
   }
   function tile(off,W2){ return ((off% W2)+W2)%W2; }
