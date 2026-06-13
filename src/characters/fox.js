@@ -3,7 +3,7 @@
    Two consumers:
      • foxSVG()          -> SVG markup string for menus / overlays
      • drawFoxCanvas()   -> animated runner on the game canvas
-   ============================================================ */
+   =======================no===================================== */
 
 function foxSVG(){
   // viewBox 0 0 120 120 — tail left, snout right, ears up.

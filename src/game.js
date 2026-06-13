@@ -453,33 +453,89 @@
       ctx.fillStyle='#0e2040';
       ctx.beginPath(); ctx.arc(W-75,47,17,0,Math.PI*2); ctx.fill();
 
-      // Far hangars — two parallax layers, blue-tinted silhouettes
-      const h1=para(0.18), h2=para(0.34);
+      // Helper: draw a building at a given x, trying all three wrap copies so it
+      // exits fully off-screen before vanishing (fixes the abrupt pop/disappear).
+      function bldg(hx, hw, hh, pitched, roofH){
+        for(const dx of [0, -W, W]){
+          const x=~~(hx+dx);
+          if(x+hw<-2 || x>W+2) continue;
+          ctx.rect(x, ~~(baseY-hh), hw, hh);
+          if(pitched) { ctx.moveTo(x,~~(baseY-hh)); ctx.lineTo(~~(x+hw/2),~~(baseY-hh-roofH)); ctx.lineTo(x+hw,~~(baseY-hh)); ctx.closePath(); }
+        }
+      }
+
+      const h1=para(0.18), h2=para(0.34), hH=para(0.085);
+
+      // Layer-1 buildings (far, slow)
       ctx.fillStyle='#2a4060';
       ctx.beginPath();
       for(let i=0;i<8;i++){
-        const hx=~~(((h1+i*160)%W+W)%W)-10;
-        const hw=80+(i*31%40), hh=42+(i*17%22);
-        ctx.rect(hx, ~~(baseY-hh), hw, hh);
-        ctx.moveTo(hx, ~~(baseY-hh)); ctx.lineTo(~~(hx+hw/2), ~~(baseY-hh-14)); ctx.lineTo(hx+hw, ~~(baseY-hh)); ctx.closePath();
-      }
-      ctx.fill();
-      ctx.fillStyle='#1e3050';
-      ctx.beginPath();
-      for(let i=0;i<5;i++){
-        const hx=~~(((h2+i*200+80)%W+W)%W)-10;
-        const hw=110+(i*23%50), hh=60+(i*13%28);
-        ctx.rect(hx, ~~(baseY-hh), hw, hh);
-        ctx.moveTo(hx, ~~(baseY-hh)); ctx.lineTo(~~(hx+hw/2), ~~(baseY-hh-18)); ctx.lineTo(hx+hw, ~~(baseY-hh)); ctx.closePath();
+        const hx=((h1+i*160)%W+W)%W-10;
+        bldg(hx, 80+(i*31%40), 42+(i*17%22), true, 14);
       }
       ctx.fill();
 
-      // Control tower
-      const tx=~~(((para(0.22)+300)%W+W)%W);
-      ctx.fillStyle='#2a4060';
-      ctx.fillRect(tx, ~~(baseY-120), 18, 98);
-      ctx.fillRect(tx-10, ~~(baseY-128), 38, 14);
-      ctx.fillRect(tx+6, ~~(baseY-140), 6, 14);
+      // Military observation tower — drawn before H building so it renders behind it
+      {
+        const txBase=((para(0.22)+300)%W+W)%W;
+        for(const dx of [0,-W,W]){
+          const tx=~~(txBase+dx);
+          if(tx+40<0 || tx-40>W) continue;
+          ctx.fillStyle='#2a4060';
+          // A-frame support legs
+          ctx.beginPath();
+          ctx.moveTo(tx-22,~~baseY); ctx.lineTo(tx-4,~~(baseY-140));
+          ctx.lineTo(tx+4,~~(baseY-140)); ctx.lineTo(tx+22,~~baseY); ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(tx-16,~~baseY); ctx.lineTo(tx-2,~~(baseY-140));
+          ctx.lineTo(tx+2,~~(baseY-140)); ctx.lineTo(tx+16,~~baseY); ctx.closePath();
+          ctx.fillStyle='#0e2040'; ctx.fill(); // hollow centre
+          // Observation cab
+          ctx.fillStyle='#2a4060';
+          ctx.fillRect(tx-18,~~(baseY-175),36,22);
+          // Window slit
+          ctx.fillStyle='#0e2040';
+          ctx.fillRect(tx-12,~~(baseY-172),24,8);
+          // Thin antenna
+          ctx.fillStyle='#2a4060';
+          ctx.fillRect(tx-1,~~(baseY-197),2,16);
+          // Red blinking tip (accent)
+          ctx.fillStyle=C.accent;
+          ctx.beginPath(); ctx.arc(tx,~~(baseY-198),2.5,0,Math.PI*2); ctx.fill();
+        }
+      }
+
+      // Layer-2 buildings (near) — H building (index 3) drawn separately with slow parallax
+      ctx.fillStyle='#1e3050';
+      ctx.beginPath();
+      for(let i=0;i<5;i++){
+        if(i===3) continue;
+        const hx=((h2+i*200+80)%W+W)%W-10;
+        bldg(hx, 110+(i*23%50), 60+(i*13%28), true, 18);
+      }
+      ctx.fill();
+
+      // H building — 4× slower parallax (0.085) so it sits deep in the background
+      ctx.fillStyle='#1e3050';
+      ctx.beginPath();
+      { const hx=((hH+3*200+80)%W+W)%W-10; bldg(hx, 129, 150, false, 0); }
+      ctx.fill();
+
+      // H marker on helipad — tracks with the slow H building
+      ctx.strokeStyle='rgba(180,210,255,0.75)'; ctx.lineWidth=2;
+      {
+        const hxBase=((hH+3*200+80)%W+W)%W-10, hw=129, ty=~~(baseY-150);
+        for(const dx of [0,-W,W]){
+          const cx=~~(hxBase+dx)+hw/2;
+          if(cx+14<0 || cx-14>W) continue;
+          ctx.beginPath();
+          ctx.moveTo(cx-7,ty+5);  ctx.lineTo(cx-7,ty+17);
+          ctx.moveTo(cx+7,ty+5);  ctx.lineTo(cx+7,ty+17);
+          ctx.moveTo(cx-7,ty+11); ctx.lineTo(cx+7,ty+11);
+          ctx.stroke();
+        }
+      }
 
     }
   }
