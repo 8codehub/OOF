@@ -415,31 +415,46 @@
       const skyG=ctx.createLinearGradient(0,0,0,baseY);
       skyG.addColorStop(0,'#5a9fd4'); skyG.addColorStop(0.65,'#f5c07a'); skyG.addColorStop(1,'#e8896a');
       ctx.fillStyle=skyG; ctx.fillRect(0,0,W,H);
-      // Single buildings layer (slow-moving backdrop) with the Empire State
-      // spike. The Statue of Liberty in front is the only other layer — 2 total.
-      const p2=para(0.34);
+      // FAR buildings layer (slow-moving backdrop) with the Empire State spike.
+      // Slower than the Statue in front of it, since it is further away.
+      const p2=para(0.16);
       skyline(p2, baseY, 0.76, '#a09890');
-      // Empire State spike (index position: roughly centre of near layer)
-      { const ex=~~(((p2+300)%(W+120)+W+120)%W)-10;
-        for(const dx of [0,-W,W]){
-          const bx=~~(ex+dx); if(bx+28<0||bx-28>W) continue;
-          ctx.fillStyle='#a09890';
-          ctx.fillRect(bx,~~(baseY-144),28,90);         // body
-          ctx.beginPath(); ctx.moveTo(bx-2,~~(baseY-144));
-          ctx.lineTo(bx+14,~~(baseY-186)); ctx.lineTo(bx+30,~~(baseY-144)); ctx.closePath(); ctx.fill(); // spire
+      // NYC landmarks in this far layer — Empire State Building + Brooklyn
+      // Bridge — tiled cleanly (pinned to a global index) so they slide in from
+      // the right and out the left without popping, matching the p2 speed.
+      { const LM_P = 720;                 // scroll-space spacing of a landmark set
+        const scroll = camX * 0.16;       // matches p2 = para(0.16)
+        const k0 = Math.floor((scroll - 200) / LM_P);
+        const k1 = Math.ceil((scroll + W + 200) / LM_P);
+        for(let k=k0; k<=k1; k++){
+          const base = k*LM_P - scroll;
+          const esx = base + 170;         // Empire State within the set
+          if(esx > -60 && esx < W+60)   drawEmpireState(ctx, ~~esx, baseY, '#938b7e');
+          const brx = base + 500;         // Brooklyn Bridge within the set
+          if(brx > -160 && brx < W+160) drawBrooklynBridge(ctx, ~~brx, baseY, '#8e8678');
         }
       }
-      // Statue of Liberty — detailed verdigris figure, very slow parallax.
+      // Statue of Liberty — NEAR (front) layer, so it moves FASTER than the
+      // distant buildings behind it.
       const lt=world ? world.t : 0;
-      const lx=~~(((para(0.055)+90)%(W+220)+W+220)%W)-60;
       // Friendly greeting wave: the raised torch arm sways gently.
       const wave = Math.sin(lt*2.2);
       // Export the nearest-to-centre statue's mouth (screen coords) so the
       // level can anchor a speech bubble there.
       world.statueMouthX = null; world.statueMouthY = null;
       let _stBest = 1e9;
-      for(const dx of [0,-W,W]){
-        const sx=~~(lx+dx); if(sx+80<0||sx-80>W) continue;
+      // Tile cleanly across the level (same wrap logic as the buildings): copies
+      // are pinned to a global index `k` and spaced ST_P apart, drawn for the
+      // whole visible range. ST_P <= W+160 guarantees a statue is always on
+      // screen, so each one slides in from the right and out the left — never
+      // popping into view mid-screen.
+      const ST_P = W + 120;
+      const stScroll = camX * 0.42;          // matches the para(0.42) speed
+      const stK0 = Math.floor((stScroll - 110) / ST_P);
+      const stK1 = Math.ceil((stScroll + W + 50) / ST_P);
+      for(let k=stK0; k<=stK1; k++){
+        const sx=~~(k*ST_P - stScroll + 30);
+        if(sx+80<0||sx-80>W) continue;
         const by=baseY;
         { const d=Math.abs(sx+1-W/2); if(d<_stBest){ _stBest=d; world.statueMouthX=sx+4; world.statueMouthY=by-167; } }
         // Verdigris palette with a consistent light-from-left scheme
@@ -927,6 +942,68 @@
   // imod — positive modulo so a global index maps to a stable pattern value
   // even when the index goes negative (camera scrolled left of the origin).
   function imod(n,m){ return ((n%m)+m)%m; }
+
+  // ---- NYC landmark silhouettes (far background layer) ----
+  // Empire State Building — Art-Deco tiered setbacks topped by the mast/antenna.
+  function drawEmpireState(ctx, cx, baseY, col){
+    const B = baseY;
+    ctx.fillStyle = col;
+    ctx.fillRect(cx-25, B-66,  50, 66);   // base block (widest)
+    ctx.fillRect(cx-19, B-104, 38, 40);   // first setback
+    ctx.fillRect(cx-12, B-176, 24, 74);   // main shaft
+    ctx.fillRect(cx-7,  B-192, 14, 18);   // crown / observation deck
+    ctx.fillRect(cx-3,  B-206,  6, 16);   // mast base
+    ctx.beginPath();                       // antenna spire
+    ctx.moveTo(cx-1.5, B-206); ctx.lineTo(cx, B-230); ctx.lineTo(cx+1.5, B-206);
+    ctx.closePath(); ctx.fill();
+    // faint vertical window seams on the shaft
+    ctx.strokeStyle = 'rgba(0,0,0,0.10)'; ctx.lineWidth = 1;
+    for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(cx+i*5, B-174); ctx.lineTo(cx+i*5, B-104); ctx.stroke(); }
+  }
+
+  // Brooklyn Bridge — two masonry towers with the signature pointed gothic
+  // arches, draped main cables and vertical suspenders down to the deck.
+  function drawBrooklynBridge(ctx, cx, baseY, col){
+    const B = baseY;
+    const span = 140, tw = 11;
+    const tx1 = cx - span/2, tx2 = cx + span/2;
+    const topY = B-120, archTop = B-72, archBot = B-6, deckY = B-16;
+
+    ctx.fillStyle = col;
+    for(const tx of [tx1, tx2]){
+      ctx.beginPath();
+      ctx.rect(tx-tw, topY, tw*2, B-topY);          // outer tower
+      ctx.moveTo(tx-6, archBot);                     // pointed-arch cutout
+      ctx.lineTo(tx-6, archTop+10);
+      ctx.quadraticCurveTo(tx-6, archTop, tx, archTop);
+      ctx.quadraticCurveTo(tx+6, archTop, tx+6, archTop+10);
+      ctx.lineTo(tx+6, archBot);
+      ctx.closePath();
+      ctx.fill('evenodd');                           // arch shows sky behind
+      ctx.fillRect(tx-tw-1, topY-3, tw*2+2, 3);      // tower cap
+    }
+
+    // main suspension cable (catenary): side anchor → tower → mid-span dip → tower → side anchor
+    const midY = B-42;
+    ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx1-66, B-18);
+    ctx.quadraticCurveTo(tx1-30, B-16, tx1, topY+4);
+    ctx.quadraticCurveTo(cx, midY, tx2, topY+4);
+    ctx.quadraticCurveTo(tx2+30, B-16, tx2+66, B-18);
+    ctx.stroke();
+    // deck
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(tx1-66, deckY); ctx.lineTo(tx2+66, deckY); ctx.stroke();
+    // vertical suspenders sampled along the mid-span catenary
+    ctx.lineWidth = 1;
+    for(let i=1;i<=7;i++){
+      const tt=i/8, u=1-tt;
+      const x = u*u*tx1 + 2*u*tt*cx + tt*tt*tx2;
+      const y = u*u*(topY+4) + 2*u*tt*midY + tt*tt*(topY+4);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, deckY); ctx.stroke();
+    }
+  }
 
   // Parallax layers are pinned to a GLOBAL world index `k`, not the on-screen
   // index. That way each building/tree/ridge keeps the same height and simply
