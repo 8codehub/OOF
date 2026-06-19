@@ -64,7 +64,7 @@
 
   // Massive animal-transport van — cab (driver) on the LEFT, barred cargo cage
   // on the RIGHT with a back door that swings open (doorOpen 0→1).
-  function drawVan(ctx, leftX, groundY, vanW, vanH, cabW, ink, accent, t, showFoxInside, doorOpen) {
+  function drawVan(ctx, leftX, groundY, vanW, vanH, cabW, ink, accent, t, showFoxInside, doorOpen, fox) {
     const topY     = groundY - vanH;
     const cabRight = leftX + cabW;
     const cageW    = vanW - cabW;
@@ -141,19 +141,11 @@
     ctx.fillStyle = 'rgba(0,0,0,0.06)';
     ctx.fillRect(cabRight + 2, topY + 2, cageW - 4, vanH - 4);
 
-    // Fox silhouette inside the cage
-    if (showFoxInside) {
-      const fx = cabRight + cageW * 0.52, fy = groundY - 10;
-      ctx.save(); ctx.globalAlpha = 0.78; ctx.fillStyle = accent;
-      ctx.beginPath(); ctx.ellipse(fx, fy - 14, 13, 10, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(fx + 12, fy - 25, 9, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(fx + 6, fy - 32); ctx.lineTo(fx + 10, fy - 42); ctx.lineTo(fx + 15, fy - 32); ctx.fill();
-      ctx.moveTo(fx + 16, fy - 32); ctx.lineTo(fx + 20, fy - 40); ctx.lineTo(fx + 25, fy - 30); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(fx - 13, fy - 10); ctx.quadraticCurveTo(fx - 28, fy - 30, fx - 18, fy - 40);
-      ctx.lineWidth = 5; ctx.strokeStyle = accent; ctx.lineCap = 'round'; ctx.stroke();
-      ctx.restore();
+    // The REAL fox (same game object) waiting inside the cage, facing the door.
+    // Drawn here — before the gate bars below — so the bars overlay it (caged).
+    if (showFoxInside && fox && window.LRFox) {
+      const fx = cabRight + cageW * 0.52;
+      LRFox.drawFoxCanvas(ctx, fx, groundY - fox.r - 6, fox.r, t * 3, ink, accent, false);
     }
 
     /* ---- CAGE GATE: identical vertical bars that LIFT straight up when opened ---- */
@@ -196,21 +188,48 @@
       ctx.beginPath(); ctx.arc(wx, groundY + 4, 5, 0, Math.PI * 2); ctx.fill();
     });
 
-    /* ---- TAP prompt above cage ---- */
-    if (showFoxInside && doorOpen < 0.02) {
-      const pulse = 0.48 + 0.52 * Math.abs(Math.sin(t * 2.8));
-      const cageCX = cabRight + cageW / 2;
-      ctx.save();
-      ctx.globalAlpha = pulse;
-      ctx.font = '700 13px Fredoka, Trebuchet MS, sans-serif';
-      ctx.fillStyle = accent; ctx.textAlign = 'center';
-      ctx.fillText('TAP TO FREE', cageCX, topY - 12);
-      ctx.font = '18px sans-serif';
-      ctx.fillText('👆', cageCX, topY - 28 - Math.abs(Math.sin(t * 2.8)) * 5);
-      ctx.restore();
-    }
-
     ctx.restore();
+  }
+
+  // Clickable "free the fox" button drawn above the cage. Returns its rect (world
+  // coords) so onUpdate can hit-test taps against the exact drawn area.
+  function drawFreeButton(ctx, cageCX, topY, accent, ink, t) {
+    const label = 'TAP TO FREE THE FOX';
+    ctx.save();
+    ctx.font = '700 12px Fredoka, Trebuchet MS, sans-serif';
+    const tw = ctx.measureText(label).width;
+    const bw = Math.round(tw + 28), bh = 30;
+    const bx = cageCX - bw / 2, by = topY - 56;
+    const pulse = 1 + 0.05 * Math.abs(Math.sin(t * 3));
+
+    // pulse around the button centre (purely visual)
+    ctx.translate(cageCX, by + bh / 2);
+    ctx.scale(pulse, pulse);
+    ctx.translate(-cageCX, -(by + bh / 2));
+
+    // little pointer from the button down toward the cage
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.moveTo(cageCX - 7, by + bh - 1);
+    ctx.lineTo(cageCX, by + bh + 9);
+    ctx.lineTo(cageCX + 7, by + bh - 1);
+    ctx.closePath(); ctx.fill();
+
+    // shadow + body + border
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    rrect(ctx, bx + 2, by + 3, bw, bh, 9); ctx.fill();
+    ctx.fillStyle = accent;
+    rrect(ctx, bx, by, bw, bh, 9); ctx.fill();
+    ctx.strokeStyle = ink; ctx.lineWidth = 2;
+    rrect(ctx, bx, by, bw, bh, 9); ctx.stroke();
+
+    // label
+    ctx.fillStyle = ink;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, cageCX, by + bh / 2 + 1);
+    ctx.restore();
+
+    return { x: bx, y: by, w: bw, h: bh };
   }
 
   function drawHeli(ctx, hx, hy, s, dir, t, flying) {
@@ -286,6 +305,7 @@
         vanLeft,
         heliWorldX, heliSitY,
         winScene: null,
+        freeBtn: null,    // rect of the on-screen FREE button (set each render)
       };
     },
 
@@ -315,10 +335,15 @@
 
         if (N.intro === 'cage') {
           f.hidden = true;
-          // Any tap frees the fox.
-          if (w.drawing !== null) {
+          // Only a tap that lands on the FREE button opens the cage.
+          if (w.drawing !== null && w.drawing.pts.length) {
+            const p = w.drawing.pts[0];      // p.x world-space, p.y screen-space
+            const b = N.freeBtn;
+            const hit = b && p.x >= b.x && p.x <= b.x + b.w &&
+                              p.y >= b.y && p.y <= b.y + b.h;
+            // Cancel the stroke either way (no ink drawing during the cutscene).
             w.drawing = null; w.strokes = [];
-            N.intro = 'opening'; N.phaseT = 0; N.escapeT = 0;
+            if (hit) { N.intro = 'opening'; N.phaseT = 0; N.escapeT = 0; }
           }
           return;
         }
@@ -409,13 +434,28 @@
       const vanVisible = w.camX < N.vanLeft + VAN_W + 60;
       if (vanVisible) {
         drawVan(ctx, N.vanLeft, baseY, VAN_W, VAN_H, VAN_CABW, C.ink, C.accent, w.t,
-                (N.intro === 'cage' || N.intro === 'opening'), N.doorOpen);
+                (N.intro === 'cage' || N.intro === 'opening'), N.doorOpen, w.fox);
       }
+      // FREE button above the cage — only before it opens. Store its rect so
+      // onUpdate hit-tests taps against the exact drawn area.
+      if (N.intro === 'cage' && vanVisible) {
+        const cageCX = N.vanLeft + VAN_CABW + (VAN_W - VAN_CABW) / 2;
+        const topY   = baseY - VAN_H;
+        N.freeBtn = drawFreeButton(ctx, cageCX, topY, C.accent, C.ink, w.t);
+      } else {
+        N.freeBtn = null;
+      }
+
       // Fox running out of the van (manual draw during runout)
       if (N.intro === 'runout') {
         const cageFoxWX = N.vanLeft + VAN_CABW + (VAN_W - VAN_CABW) * 0.52;
         const wx = cageFoxWX + (w.startX - cageFoxWX) * N.runoutP;
-        LRFox.drawFoxCanvas(ctx, wx, baseY - w.fox.r, w.fox.r, w.t * 16, C.ink, C.accent, false);
+        // Keep the bed-height lift (6px) while the fox is still over the van,
+        // then ease it down to the ground as it clears the end of the car.
+        const carEndX = N.vanLeft + VAN_W;
+        const exitP = Math.max(0, Math.min(1, (wx - cageFoxWX) / (carEndX - cageFoxWX)));
+        const lift = 6 * (1 - exitP);
+        LRFox.drawFoxCanvas(ctx, wx, baseY - w.fox.r - lift, w.fox.r, w.t * 16, C.ink, C.accent, false);
       }
 
       /* ===== SCREEN-SPACE (cancel camera translate) ===== */
