@@ -233,6 +233,8 @@
     ctx.restore();
   }
 
+  window.LRDrawHeli = drawHeli;   // reused by level 2 intro
+
   function playJingle() {
     try {
       const ac = new (window.AudioContext || window.webkitAudioContext)();

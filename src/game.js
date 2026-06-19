@@ -415,9 +415,8 @@
       const skyG=ctx.createLinearGradient(0,0,0,baseY);
       skyG.addColorStop(0,'#5a9fd4'); skyG.addColorStop(0.65,'#f5c07a'); skyG.addColorStop(1,'#e8896a');
       ctx.fillStyle=skyG; ctx.fillRect(0,0,W,H);
-      // Far buildings
-      skyline(para(0.16), baseY, 0.44, '#c9c4b8');
-      // Near buildings with a spike (Empire State silhouette inserted)
+      // Single buildings layer (slow-moving backdrop) with the Empire State
+      // spike. The Statue of Liberty in front is the only other layer — 2 total.
       const p2=para(0.34);
       skyline(p2, baseY, 0.76, '#a09890');
       // Empire State spike (index position: roughly centre of near layer)
@@ -577,6 +576,124 @@
         ctx.beginPath(); ctx.ellipse(0,-80,1.8,5,0,0,Math.PI*2); ctx.fill();
         ctx.restore();
       }
+    } else if(theme==='lax'){
+      // California blue sky
+      const laxSky=ctx.createLinearGradient(0,0,0,baseY);
+      laxSky.addColorStop(0,'#70b8e8'); laxSky.addColorStop(0.6,'#c0e0f8'); laxSky.addColorStop(1,'#f0d8a8');
+      ctx.fillStyle=laxSky; ctx.fillRect(0,0,W,H);
+      // Sun
+      ctx.globalAlpha=0.88;
+      ctx.fillStyle='#ffe060';
+      ctx.beginPath(); ctx.arc(W*0.80,58,28,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha=1;
+      // Far skyline
+      skyline(para(0.18), baseY, 0.44, '#c0b8ac');
+      // LAX Theme Building (UFO on legs) — distinctive landmark
+      { const lp=(para(0.08)+280); const lxBase=~~(((lp%(W+160)+W+160)%W)-80);
+        for(const dx of [0,-W,W]){
+          const sx=~~(lxBase+dx); if(sx+100<0||sx-100>W) continue;
+          const by=baseY;
+          // 4 A-frame legs
+          ctx.strokeStyle='#a09080'; ctx.lineWidth=4; ctx.lineCap='round';
+          for(const leg of [-32,32]){
+            ctx.beginPath(); ctx.moveTo(sx+leg,by); ctx.lineTo(sx,by-85); ctx.stroke();
+          }
+          for(const leg of [-20,20]){
+            ctx.beginPath(); ctx.moveTo(sx+leg,by); ctx.lineTo(sx,by-85); ctx.stroke();
+          }
+          // UFO saucer
+          const sg=ctx.createRadialGradient(sx,by-100,4,sx,by-100,42);
+          sg.addColorStop(0,'#e8e0d8'); sg.addColorStop(1,'#c0b8b0');
+          ctx.fillStyle=sg;
+          ctx.beginPath(); ctx.ellipse(sx,by-98,42,16,0,0,Math.PI*2); ctx.fill();
+          ctx.strokeStyle='#a09088'; ctx.lineWidth=2; ctx.stroke();
+          // Dome
+          ctx.fillStyle='#c8d0d8';
+          ctx.beginPath(); ctx.ellipse(sx,by-108,26,12,0,Math.PI,0); ctx.fill();
+          ctx.strokeStyle='#9098a0'; ctx.lineWidth=1.5; ctx.stroke();
+          // Windows (dots around saucer)
+          ctx.fillStyle='#ffe890';
+          for(let k=0;k<8;k++){
+            const a=(k/8)*Math.PI*2;
+            ctx.beginPath(); ctx.arc(sx+Math.cos(a)*28,by-98+Math.sin(a)*8,2.5,0,Math.PI*2); ctx.fill();
+          }
+        }
+      }
+      // Palm trees
+      for(const pOff of [60,310,580,780]){
+        const pp=para(0.38); const pxBase=~~(((pp+pOff)%(W+80)+W+80)%W)-20;
+        for(const dx of [0,-W,W]){
+          const sx=~~(pxBase+dx); if(sx<-30||sx>W+30) continue;
+          // Trunk (slightly curved)
+          ctx.strokeStyle='#8a7060'; ctx.lineWidth=5; ctx.lineCap='round';
+          ctx.beginPath(); ctx.moveTo(sx,baseY); ctx.quadraticCurveTo(sx+10,baseY-42,sx+5,baseY-72); ctx.stroke();
+          // Fronds
+          ctx.strokeStyle='#3a7a2a'; ctx.lineWidth=3;
+          for(let k=0;k<7;k++){
+            const a=(-0.9+(k/6)*1.8)*Math.PI/2-Math.PI/4;
+            const len=20+(k%3)*7;
+            ctx.beginPath(); ctx.moveTo(sx+5,baseY-72);
+            ctx.quadraticCurveTo(sx+5+Math.cos(a)*len*0.5,baseY-72+Math.sin(a)*len*0.5-10,
+                                 sx+5+Math.cos(a)*len,baseY-72+Math.sin(a)*len);
+            ctx.stroke();
+          }
+        }
+      }
+      // Nearer buildings + control tower
+      skyline(para(0.38), baseY, 0.74, '#b0a89a');
+      { const tp=para(0.22)+500; const txBase=~~(((tp%(W+60)+W+60)%W)-30);
+        for(const dx of [0,-W,W]){
+          const sx=~~(txBase+dx); if(sx+36<0||sx-36>W) continue;
+          const by=baseY;
+          ctx.fillStyle='#a8a098'; ctx.fillRect(sx-9,by-148,18,148);
+          ctx.fillStyle='#88c8e0'; ctx.fillRect(sx-20,by-168,40,24);
+          ctx.strokeStyle='#6898b0'; ctx.lineWidth=1.5; ctx.strokeRect(sx-20,by-168,40,24);
+          ctx.strokeStyle='#a8a098'; ctx.lineWidth=2; ctx.lineCap='round';
+          ctx.beginPath(); ctx.moveTo(sx,by-168); ctx.lineTo(sx,by-190); ctx.stroke();
+        }
+      }
+    } else if(theme==='sahara'){
+      // Hot desert sky gradient
+      const sahSky=ctx.createLinearGradient(0,0,0,baseY);
+      sahSky.addColorStop(0,'#5e9abe'); sahSky.addColorStop(0.5,'#c4904a'); sahSky.addColorStop(1,'#dca84a');
+      ctx.fillStyle=sahSky; ctx.fillRect(0,0,W,H);
+      // Blazing sun with halo
+      const sunX=W*0.82,sunY=52;
+      const sHalo=ctx.createRadialGradient(sunX,sunY,14,sunX,sunY,42);
+      sHalo.addColorStop(0,'rgba(255,240,160,0.9)'); sHalo.addColorStop(1,'rgba(255,200,60,0)');
+      ctx.fillStyle=sHalo; ctx.beginPath(); ctx.arc(sunX,sunY,42,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#fff4c0';
+      ctx.beginPath(); ctx.arc(sunX,sunY,17,0,Math.PI*2); ctx.fill();
+      // Pyramids — far layer (slow parallax)
+      { const pp=para(0.09)+80; const pxBase=~~(((pp%(W+500)+W+500)%W)-100);
+        for(const dx of [0,-W,W]){
+          const ox=~~(pxBase+dx); if(ox+450<0||ox-450>W) continue;
+          // Great Pyramid
+          ctx.fillStyle='#c8a86a';
+          ctx.beginPath(); ctx.moveTo(ox,baseY-1); ctx.lineTo(ox+130,baseY-148); ctx.lineTo(ox+260,baseY-1); ctx.closePath(); ctx.fill();
+          ctx.fillStyle='#a88848';
+          ctx.beginPath(); ctx.moveTo(ox+130,baseY-148); ctx.lineTo(ox+260,baseY-1); ctx.lineTo(ox+196,baseY-1); ctx.closePath(); ctx.fill();
+          // Khafre pyramid (right, slightly smaller)
+          ctx.fillStyle='#c0a062';
+          ctx.beginPath(); ctx.moveTo(ox+280,baseY-1); ctx.lineTo(ox+378,baseY-118); ctx.lineTo(ox+476,baseY-1); ctx.closePath(); ctx.fill();
+          ctx.fillStyle='#a08040';
+          ctx.beginPath(); ctx.moveTo(ox+378,baseY-118); ctx.lineTo(ox+476,baseY-1); ctx.lineTo(ox+430,baseY-1); ctx.closePath(); ctx.fill();
+        }
+      }
+      // Far sand dunes (very slow)
+      ctx.fillStyle='#d4aa72';
+      ctx.beginPath();
+      { let x=-~~((-para(0.14)%(W+200)+W+200)%W)-100; ctx.moveTo(x,baseY);
+        for(;x<W+200;x+=190){ ctx.quadraticCurveTo(x+95,baseY-68,x+190,baseY); }
+        ctx.lineTo(W+200,H); ctx.lineTo(-100,H); ctx.closePath(); }
+      ctx.fill();
+      // Near sand dunes
+      ctx.fillStyle='#c89850';
+      ctx.beginPath();
+      { let x=-~~((-para(0.34)%(W+140)+W+140)%W)-80; ctx.moveTo(x,baseY);
+        for(;x<W+140;x+=145){ ctx.quadraticCurveTo(x+72,baseY-44,x+145,baseY); }
+        ctx.lineTo(W+140,H); ctx.lineTo(-80,H); ctx.closePath(); }
+      ctx.fill();
     } else if(theme==='meadow'){
       ctx.fillStyle=C.bg2;
       ctx.beginPath(); ctx.arc(W-70, 120, 38, 0, Math.PI*2); ctx.fill();
@@ -807,32 +924,43 @@
     for(; x<W+step; x+=step){ ctx.quadraticCurveTo(x+step/2, y-h, x+step, y+h); }
     ctx.lineTo(W+step,H); ctx.lineTo(-step,H); ctx.closePath(); ctx.fill();
   }
+  // imod — positive modulo so a global index maps to a stable pattern value
+  // even when the index goes negative (camera scrolled left of the origin).
+  function imod(n,m){ return ((n%m)+m)%m; }
+
+  // Parallax layers are pinned to a GLOBAL world index `k`, not the on-screen
+  // index. That way each building/tree/ridge keeps the same height and simply
+  // slides as the camera scrolls — it never morphs/jumps. `off = -(camX*f)`,
+  // so `scroll = -off` is the layer's parallax-world offset in px.
   function skyline(off, baseY, scale, col){
     ctx.fillStyle=col; const unit=46;
-    let x=-tile(-off,unit*2)-unit*2;
+    const scroll=-off;
+    let k=Math.floor((scroll-unit)/unit);
     ctx.beginPath();
-    for(let i=0; x<W+unit; x+=unit, i++){
-      const h=(60+(i*53%120))*scale;
+    for(let x=k*unit-scroll; x<W+unit; k++, x=k*unit-scroll){
+      const h=(60+imod(k*53,120))*scale;
       ctx.rect(~~x, ~~(baseY-h), unit-6, ~~h);
     }
     ctx.fill();
   }
   function pines(off, baseY, scale, col, h0){
     ctx.fillStyle=col; const unit=70;
-    let x=-tile(-off,unit)-unit;
+    const scroll=-off;
+    let k=Math.floor((scroll-unit)/unit);
     ctx.beginPath();
-    for(let i=0; x<W+unit; x+=unit, i++){
-      const h=(h0+(i*37%50))*scale, w2=h*0.5;
+    for(let x=k*unit-scroll; x<W+unit; k++, x=k*unit-scroll){
+      const h=(h0+imod(k*37,50))*scale, w2=h*0.5;
       ctx.moveTo(~~x, baseY); ctx.lineTo(~~(x+w2/2), ~~(baseY-h)); ctx.lineTo(~~(x+w2), baseY); ctx.closePath();
     }
     ctx.fill();
   }
   function ridges(off, baseY, scale, col){
     ctx.fillStyle=col; const unit=130;
-    let x=-tile(-off,unit)-unit;
-    ctx.beginPath(); ctx.moveTo(x, baseY);
-    for(let i=0; x<W+unit; x+=unit, i++){
-      const h=(120+ (i*71%90))*scale;
+    const scroll=-off;
+    let k=Math.floor((scroll-unit)/unit);
+    ctx.beginPath(); ctx.moveTo(k*unit-scroll, baseY);
+    for(let x=k*unit-scroll; x<W+unit; k++, x=k*unit-scroll){
+      const h=(120+imod(k*71,90))*scale;
       ctx.lineTo(x+unit/2, baseY-h); ctx.lineTo(x+unit, baseY);
     }
     ctx.lineTo(W+unit,H); ctx.lineTo(-unit,H); ctx.closePath(); ctx.fill();
