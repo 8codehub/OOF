@@ -431,7 +431,13 @@
           const esx = base + 170;         // Empire State within the set
           if(esx > -60 && esx < W+60)   drawEmpireState(ctx, ~~esx, baseY, '#938b7e');
           const brx = base + 500;         // Brooklyn Bridge within the set
-          if(brx > -160 && brx < W+160) drawBrooklynBridge(ctx, ~~brx, baseY, '#8e8678');
+          if(brx > -160 && brx < W+160){
+            // No buildings behind the bridge — re-paint open sky over its
+            // footprint (erasing the skyline there) before drawing it.
+            ctx.fillStyle = skyG;
+            ctx.fillRect(~~brx-150, 0, 300, baseY);
+            drawBrooklynBridge(ctx, ~~brx, baseY, '#8e8678');
+          }
         }
       }
       // Statue of Liberty — NEAR (front) layer, so it moves FASTER than the
@@ -967,12 +973,14 @@
     const B = baseY;
     const span = 140, tw = 11;
     const tx1 = cx - span/2, tx2 = cx + span/2;
-    const topY = B-120, archTop = B-72, archBot = B-6, deckY = B-16;
+    const topY = B-120, archTop = B-72, archBot = B-6, deckY = B-14;
+    const endL = tx1-66, endR = tx2+66;             // outer ends of the spans
 
     ctx.fillStyle = col;
+    // towers (grounded) with the signature pointed gothic arches
     for(const tx of [tx1, tx2]){
       ctx.beginPath();
-      ctx.rect(tx-tw, topY, tw*2, B-topY);          // outer tower
+      ctx.rect(tx-tw, topY, tw*2, B-topY);          // outer tower, down to the ground
       ctx.moveTo(tx-6, archBot);                     // pointed-arch cutout
       ctx.lineTo(tx-6, archTop+10);
       ctx.quadraticCurveTo(tx-6, archTop, tx, archTop);
@@ -983,18 +991,23 @@
       ctx.fillRect(tx-tw-1, topY-3, tw*2+2, 3);      // tower cap
     }
 
-    // main suspension cable (catenary): side anchor → tower → mid-span dip → tower → side anchor
+    // main cable: from the GROUND at each outer end, up over both towers, dipping mid-span
     const midY = B-42;
     ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(tx1-66, B-18);
+    ctx.moveTo(endL, B);                              // rest on the ground (no float)
     ctx.quadraticCurveTo(tx1-30, B-16, tx1, topY+4);
     ctx.quadraticCurveTo(cx, midY, tx2, topY+4);
-    ctx.quadraticCurveTo(tx2+30, B-16, tx2+66, B-18);
+    ctx.quadraticCurveTo(tx2+30, B-16, endR, B);      // rest on the ground (no float)
     ctx.stroke();
-    // deck
+
+    // deck: horizontal across the span, ramping down to the ground at the outer ends
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(tx1-66, deckY); ctx.lineTo(tx2+66, deckY); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(endL, B); ctx.lineTo(tx1, deckY);
+    ctx.lineTo(tx2, deckY); ctx.lineTo(endR, B);
+    ctx.stroke();
+
     // vertical suspenders sampled along the mid-span catenary
     ctx.lineWidth = 1;
     for(let i=1;i<=7;i++){
