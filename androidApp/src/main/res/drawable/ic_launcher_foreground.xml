@@ -34,7 +34,7 @@
         android:fillColor="#B24A1E"/>
     <path
         android:pathData="M199.76,303.3C147.37,314.94 100.79,285.83 112.43,233.44C124.08,198.5 164.83,204.33 176.47,239.26C188.12,268.37 211.41,285.83 199.76,303.3"
-        android:fillColor="#009"/>
+        android:fillColor="#9C27B0"/>
     <path
         android:pathData="M83.33,233.44C83.33,181.04 135.72,169.4 164.83,204.33C129.9,192.68 100.79,204.33 100.79,245.08Z"
         android:strokeLineJoin="round"
