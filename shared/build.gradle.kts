@@ -13,7 +13,7 @@ kotlin {
             baseName = "Shared"
             isStatic = true
             freeCompilerArgs += listOf(
-                "-Xbinary=bundleId=com.line.runner.shared",
+                "-Xbinary=bundleId=com.foxymoxy.shared",
                 "-Xoverride-konan-properties=osVersionMin.ios_arm64=17.0"
             )
         }
@@ -23,17 +23,17 @@ kotlin {
             baseName = "Shared"
             isStatic = true
             freeCompilerArgs += listOf(
-                "-Xbinary=bundleId=com.line.runner.shared",
+                "-Xbinary=bundleId=com.foxymoxy.shared",
                 "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=17.0"
             )
         }
     }
     
     androidLibrary {
-       namespace = "com.line.runner.shared"
+       namespace = "com.foxymoxy.shared"
        compileSdk = libs.versions.android.compileSdk.get().toInt()
        minSdk = libs.versions.android.minSdk.get().toInt()
-    
+
        compilerOptions {
            jvmTarget = JvmTarget.JVM_11
        }
